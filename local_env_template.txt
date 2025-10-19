@@ -1,4 +1,5 @@
-# Email Configuration
+# If running locally
+#Email Configuration
 # Rename this file to .env and fill in your actual credentials
 
 # Replace with your actual Gmail address
