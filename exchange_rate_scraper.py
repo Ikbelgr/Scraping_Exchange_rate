@@ -271,7 +271,7 @@ class ExchangeRatesScraper:
         raise Exception(f"Failed to get WesternUnion rate from {url}")
 
     def get_moneygram_rate(self, entry):
-        """Scrape MoneyGram exchange rate"""
+        """Scrape MoneyGram exchange rate - Enhanced for GitHub Actions"""
         url = entry['url']
         currency = entry.get('currency', '')
         logger.info(f"Scraping MoneyGram: {entry['provider']} -> {url}")
@@ -285,7 +285,7 @@ class ExchangeRatesScraper:
                 except Exception:
                     pass
                 
-                time.sleep(5)  # Increased wait time
+                time.sleep(8)  # Longer wait for dynamic content
                 
                 try:
                     consent_btn = WebDriverWait(driver, 10).until(
@@ -293,7 +293,7 @@ class ExchangeRatesScraper:
                     )
                     consent_btn.click()
                     logger.info("Clicked cookie consent button (MoneyGram).")
-                    time.sleep(2)
+                    time.sleep(3)
                 except Exception:
                     logger.debug("No cookie consent button found on MoneyGram.")
                 
@@ -302,67 +302,26 @@ class ExchangeRatesScraper:
                     EC.presence_of_element_located((By.CSS_SELECTOR, "body"))
                 )
                 
-                time.sleep(5)  # Additional wait for dynamic content
+                time.sleep(8)  # Additional wait for dynamic content
                 
                 # Scroll to trigger any lazy loading
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+                time.sleep(3)
+                
+                # Scroll back up to look for rate elements
+                driver.execute_script("window.scrollTo(0, 0);")
                 time.sleep(2)
                 
-                # Enhanced selectors for MoneyGram - targeting the specific exchange rate element
-                selectors = [
-                    # Specific selectors for the exchange rate element
-                    "span.text-mgSuccess-500.leading-4.font-regular",
-                    "span.break-words.hyphens-manual.text-mgSuccess-500.leading-4.font-regular",
-                    "span[class*='text-mgSuccess-500'][class*='leading-4'][class*='font-regular']",
-                    "span[class*='text-mgSuccess-500'][class*='leading-4']",
-                    # More specific patterns
-                    "span:contains('1 EUR')",
-                    "span:contains('EUR =')",
-                    "span:contains('TND')",
-                    "span:contains('MAD')",
-                    # Rate-specific selectors
-                    "span[class*='rate']",
-                    "div[class*='rate']", 
-                    "span[class*='fx']",
-                    "div[class*='fx']",
-                    "span[class*='exchange']",
-                    "div[class*='exchange']",
-                    "span[class*='conversion']",
-                    "div[class*='conversion']",
-                    # General text selectors
-                    "span.text-mgSuccess-500",
-                    "span.fx-rate",
-                    "span.rate",
-                    "div.rate",
-                    "p.rate",
-                    # Money amount selectors
-                    "span[class*='amount']",
-                    "div[class*='amount']",
-                    "span[class*='money']",
-                    "div[class*='money']",
-                    # Generic selectors
-                    "span",
-                    "div", 
-                    "p",
-                    "h1", "h2", "h3", "h4", "h5", "h6"
-                ]
+                # Wait a bit more for any dynamic content to load
+                time.sleep(5)
                 
-                found_rates = []
-                
-                # First, try to find the specific exchange rate element with XPath
+                # Look for the specific exchange rate element
                 try:
-                    # Look for span containing "1 EUR = X.XX TND/MAD" pattern
+                    # First try XPath for the exact element structure
                     xpath_patterns = [
-                        # Specific patterns for the exact element structure
-                        "//span[@class='break-words hyphens-manual text-mgSuccess-500 leading-4 font-regular' and contains(text(), '1 EUR =')]",
-                        "//span[contains(@class, 'text-mgSuccess-500') and contains(@class, 'leading-4') and contains(@class, 'font-regular') and contains(text(), '1 EUR =')]",
-                        # General patterns for both currencies
                         "//span[contains(text(), '1 EUR =') and contains(text(), 'TND')]",
                         "//span[contains(text(), '1 EUR =') and contains(text(), 'MAD')]",
-                        "//span[contains(text(), 'EUR =') and contains(text(), 'TND')]",
-                        "//span[contains(text(), 'EUR =') and contains(text(), 'MAD')]",
-                        "//span[contains(@class, 'text-mgSuccess-500') and contains(text(), '1 EUR =')]",
-                        "//span[contains(@class, 'text-mgSuccess-500') and contains(text(), 'EUR =')]"
+                        "//span[contains(@class, 'text-mgSuccess-500') and contains(text(), '1 EUR =')]"
                     ]
                     
                     for xpath in xpath_patterns:
@@ -370,87 +329,37 @@ class ExchangeRatesScraper:
                             elements = driver.find_elements(By.XPATH, xpath)
                             for elem in elements:
                                 text = elem.text.strip()
-                                if text:
+                                if text and "1 EUR" in text and "=" in text and currency in text:
                                     logger.info(f"MoneyGram XPath found: {text}")
-                                    if "1 EUR" in text and "=" in text and currency in text:
-                                        match = re.search(r'1\s*EUR\s*=\s*([\d,\.]+)', text)
-                                        if match:
-                                            try:
-                                                rate = float(match.group(1).replace(',', '.'))
-                                                if rate > 0 and rate < 1000:
-                                                    logger.info(f"✓ MoneyGram rate found (XPath): {rate}")
-                                                    return rate
-                                            except ValueError:
-                                                continue
-                        except Exception as e:
-                            logger.debug(f"XPath error: {e}")
-                            continue
-                except Exception as e:
-                    logger.debug(f"XPath search failed: {e}")
-                
-                # Fallback to CSS selectors
-                for sel in selectors:
-                    try:
-                        elems = driver.find_elements(By.CSS_SELECTOR, sel)
-                        for elem in elems:
-                            text = elem.text.strip()
-                            if text and len(text) < 200:  # Avoid very long text blocks
-                                logger.info(f"MoneyGram candidate text: {text}")
-                                
-                                # Skip the "Send up to" text we don't want
-                                if "Send up to" in text:
-                                    logger.debug("Skipping 'Send up to' text")
-                                    continue
-                                
-                                # Pattern 1: 1 EUR = X.XX TND
-                                if "1 EUR" in text and "=" in text and currency in text:
                                     match = re.search(r'1\s*EUR\s*=\s*([\d,\.]+)', text)
                                     if match:
                                         try:
                                             rate = float(match.group(1).replace(',', '.'))
                                             if rate > 0 and rate < 1000:
-                                                logger.info(f"✓ MoneyGram rate found (pattern 1): {rate}")
+                                                logger.info(f"✓ MoneyGram rate found: {rate}")
                                                 return rate
                                         except ValueError:
                                             continue
-                                
-                                # Pattern 2: EUR 1 = X.XX TND
-                                if "EUR 1" in text and "=" in text and currency in text:
-                                    match = re.search(r'EUR\s*1\s*=\s*([\d,\.]+)', text)
-                                    if match:
-                                        try:
-                                            rate = float(match.group(1).replace(',', '.'))
-                                            if rate > 0 and rate < 1000:
-                                                logger.info(f"✓ MoneyGram rate found (pattern 2): {rate}")
-                                                return rate
-                                        except ValueError:
-                                            continue
-                                
-                                # Pattern 3: Just numbers with currency (but skip "Send up to" text)
-                                if currency in text and any(char.isdigit() for char in text) and "Send up to" not in text:
-                                    numbers = re.findall(r'([\d,\.]+)', text)
-                                    for num in numbers:
-                                        try:
-                                            rate = float(num.replace(',', '.'))
-                                            if rate > 0 and rate < 1000:
-                                                found_rates.append(rate)
-                                                logger.info(f"MoneyGram potential rate: {rate}")
-                                        except ValueError:
-                                            continue
-                    except Exception as e:
-                        logger.debug(f"Error with selector {sel}: {e}")
-                        continue
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
                 
-                # If we found potential rates, return the most reasonable one
-                if found_rates:
-                    # Filter out obviously wrong rates (too high/low)
-                    valid_rates = [r for r in found_rates if 0.1 < r < 100]
-                    if valid_rates:
-                        # Return the median rate (most likely to be correct)
-                        valid_rates.sort()
-                        median_rate = valid_rates[len(valid_rates)//2]
-                        logger.info(f"✓ MoneyGram rate found (from candidates): {median_rate}")
-                        return median_rate
+                # Fallback: search all text elements
+                all_elements = driver.find_elements(By.CSS_SELECTOR, "span, div, p")
+                for elem in all_elements:
+                    text = elem.text.strip()
+                    if text and "1 EUR" in text and "=" in text and currency in text and "Send up to" not in text:
+                        logger.info(f"MoneyGram found: {text}")
+                        match = re.search(r'1\s*EUR\s*=\s*([\d,\.]+)', text)
+                        if match:
+                            try:
+                                rate = float(match.group(1).replace(',', '.'))
+                                if rate > 0 and rate < 1000:
+                                    logger.info(f"✓ MoneyGram rate found: {rate}")
+                                    return rate
+                            except ValueError:
+                                continue
                 
                 screenshot_path = f"moneygram_debug_{int(time.time())}.png"
                 driver.save_screenshot(screenshot_path)
