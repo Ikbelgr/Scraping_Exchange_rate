@@ -1,0 +1,9 @@
+# Email Configuration
+# Rename this file to .env and fill in your actual credentials
+
+# Replace with your actual Gmail address
+SENDER_EMAIL=your_email@gmail.com
+
+# Replace with your Gmail app password (not your regular password)
+# To get an app password: https://support.google.com/accounts/answer/185833
+EMAIL_APP_PASSWORD=your_app_password_here
