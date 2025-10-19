@@ -1003,10 +1003,10 @@ class ExchangeRatesScraper:
             self.send_email_without_attachment(
                 to_email=[
                     "ikbelghrab13@gmail.com",
-                    # "nouha@myeasytransfer.com",
-                    # "selim.maaoui@myeasytransfer.com",
-                    # "ismail.khenissi@myeasytransfer.com",
-                    # "jabrane.khenissi@myeasytransfer.com"
+                    "nouha@myeasytransfer.com",
+                    "selim.maaoui@myeasytransfer.com",
+                    "ismail.khenissi@myeasytransfer.com",
+                    "jabrane.khenissi@myeasytransfer.com"
                 ],
                 subject=f"Exchange Rates -- {current_time.strftime('%Y-%m-%d %H:%M:%S')}",
                 body=mail_body
